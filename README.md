@@ -22,7 +22,7 @@ new proof protocol:
 The vendored Nova copy adds a narrow arithmetic-provider hook and read-only MSM
 telemetry. Microsoft Nova remains responsible for the proof protocol and
 transcript; cuda-oxide executes selected arithmetic requested by that protocol.
-See [`crates/cuda-nova/README.md`](crates/cuda-nova/README.md) for the exact
+See the [`cuda-nova` README](https://github.com/RyanKung/cuda-nova#readme) for the exact
 host/device boundary, feature matrix, commands, and current measurement scope.
 
 ## Workspace layout
@@ -30,7 +30,7 @@ host/device boundary, feature matrix, commands, and current measurement scope.
 - `crates/zkfly-matrix`: deterministic MaleCNS-to-CSR artifact builder.
 - `crates/zkfly-commitment`: canonical Poseidon topology encoding and root.
 - `crates/zkfly-nova`: Nova topology and private weighted-forward relations.
-- `crates/cuda-nova`: CUDA Rust sidecar and structured proof profiler.
+- [`cuda-nova`](https://github.com/RyanKung/cuda-nova): CUDA Rust sidecar and structured proof profiler.
 - `crates/zkfly-bench`: CPU/CUDA execution benchmarks and capacity estimator.
 - `vendor/nova-snark`: audited Nova 0.76 integration patch.
 - `paper`: claim-bounded LaTeX paper and bibliography.
@@ -138,8 +138,9 @@ has a CPU fallback and an optional official Blitzar path. This is complete Nova
 R1CS synthesis and recursive folding with an explicit CUDA Rust arithmetic
 boundary, not a replacement Nova protocol.
 
-On the V100, generate `cuda_nova.ptx` with `cargo oxide`, then run the sidecar
-with both the toolkit path and `nvcc` directory configured:
+From a `cuda-nova` checkout on the V100, generate `cuda_nova.ptx` with
+`cargo oxide`, then run the sidecar with both the toolkit path and `nvcc`
+directory configured:
 
 ```sh
 export PATH=/usr/local/cuda/bin:$PATH
