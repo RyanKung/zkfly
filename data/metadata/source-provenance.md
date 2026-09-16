@@ -8,7 +8,6 @@
 - Posted: 2025-05-07 18:19, as shown on the Figshare landing page
 - Local directory: `data/raw/figshare-v4/`
 - Manifest: `data/metadata/figshare-v4-manifest.tsv`
-- Local evidence page: `data/metadata/flybody-pmc12310536.html`
 
 All seven Figshare v4 files were downloaded and validated with `unzip -t`.
 `flight-controller-reuse-checkpoints.zip` was retrieved through the official
