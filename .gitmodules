@@ -1,0 +1,4 @@
+[submodule "crates/cuda-nova"]
+	path = crates/cuda-nova
+	url = https://github.com/RyanKung/cuda-nova.git
+	branch = main

@@ -1,0 +1,8 @@
+name	file_id	status	size_bytes	sha256	source_url	notes
+dataset_fly-confocal-stack.zip	44732929	downloaded	1243490469	cc8d070fa1a1b4db53b9841c2d1ae87460b0c9e09380896f33a9966ba36491a6	https://janelia.figshare.com/ndownloader/files/44732929	unzip -t passed
+videos_fly-anatomy.zip	44733022	downloaded	37170268	62d85fb552cc21eaf31bfefb5e636186f21ed3b43af9d03a8f0f5a7ad72db069	https://janelia.figshare.com/ndownloader/files/44733022	unzip -t passed
+trained-fly-policies.zip	44815195	downloaded	6537720	2d9937c9af2baafad1690c1b318791bde417b4d26dd96d4385ab6723d5d58582	https://janelia.figshare.com/ndownloader/files/44815195	unzip -t passed
+datasets_flight-imitation.zip	51196859	downloaded	12880076	0d152331e38f2ca6bb1f3286c2500eab49b5ccef93c51a9cc9cff9bb6cd368d0	https://janelia.figshare.com/ndownloader/files/51196859	unzip -t passed
+datasets_walking-imitation.zip	51196868	downloaded	3019999672	65f0ed466a5ecdea6fc3e8837a9e26f6eb2d3d08904bbd4dd2761331d5e2c798	https://janelia.figshare.com/ndownloader/files/51196868	unzip -t passed
+flight-controller-reuse-checkpoints.zip	51196886	downloaded	31979537	b0bd780a62497b3e91e1113946f6a7808888b66f3a59bf8762d50706d9e6bbe4	https://ndownloader.figshare.com/files/51196886	official MD5 8c6c87234b8eb7f6f02eaa70ed1c8484 matched; unzip -t passed
+dataset_fly-grooming-poses.zip	52159823	downloaded	314449	bfd2fb6f7c7f4c0c0e230985e0434f304d5608a6a6cff01b54e6ceaacf676587	https://janelia.figshare.com/ndownloader/files/52159823	unzip -t passed

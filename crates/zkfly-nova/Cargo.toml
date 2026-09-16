@@ -1,0 +1,28 @@
+[package]
+name = "zkfly-nova"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Nova proof adapter for zkfly topology fold transitions"
+
+[features]
+default = []
+gpu-msm = ["nova-snark/blitzar"]
+hyperkzg = ["nova-snark/io"]
+
+[dependencies]
+ark-bn254.workspace = true
+ark-ff.workspace = true
+ff.workspace = true
+halo2curves.workspace = true
+light-poseidon.workspace = true
+nova-snark.workspace = true
+thiserror.workspace = true
+zkfly-commitment = { path = "../zkfly-commitment" }
+
+[dev-dependencies]
+nova-snark = { workspace = true, features = ["test-utils"] }
+
+[lints]
+workspace = true

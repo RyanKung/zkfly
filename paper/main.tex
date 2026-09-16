@@ -1,0 +1,394 @@
+\documentclass[9pt,twocolumn]{extarticle}
+
+\usepackage[letterpaper,top=0.62in,bottom=0.68in,left=0.62in,right=0.62in,columnsep=0.22in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,tabularx,multirow}
+\usepackage{siunitx}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.14}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\makeatletter
+\newcommand{\theHALG@line}{\thealgorithm.\arabic{ALG@line}}
+\makeatother
+
+\definecolor{zkblue}{HTML}{245C8A}
+\definecolor{zkorange}{HTML}{C65D21}
+\definecolor{zkgreen}{HTML}{2C7A4B}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=zkblue,
+  citecolor=zkblue,
+  urlcolor=zkblue,
+  pdftitle={ZKFly: CUDA-Accelerated Nova for Private Sparse-Graph Execution},
+  pdfauthor={Ryan Kung}
+}
+\setlength{\parindent}{0.8em}
+\setlength{\parskip}{0pt}
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{5pt plus 2pt minus 2pt}
+\setlength{\intextsep}{5pt plus 2pt minus 2pt}
+\setlist{nosep,leftmargin=*}
+\captionsetup{belowskip=0pt}
+\sisetup{group-separator={,},group-minimum-digits=4}
+
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\NN}{\mathbb{N}}
+\newcommand{\Commit}{\mathsf{Com}}
+\newcommand{\Poseidon}{\mathsf{Poseidon}}
+\newcommand{\SpMV}{\mathsf{SpMV}}
+\newcommand{\nnz}{\operatorname{nnz}}
+\newcommand{\ceil}[1]{\left\lceil #1\right\rceil}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\vspace{-1.2em}\textbf{ZKFly: CUDA-Accelerated Nova for Private Sparse-Graph Execution}\vspace{-0.5em}}
+\author{Ryan Kung\\[-0.2em]
+\small\href{mailto:ryankung@ieee.org}{\texttt{ryankung@ieee.org}}}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.6em}
+
+\begin{abstract}
+ZKFly binds a canonical sparse connectome to a Poseidon root and proves a chain of private weighted CSR evaluations with Nova.  The public state is two field elements: a vector commitment and a fixed topology root.  The implementation uses HyperKZG, GPU multi-scalar multiplication (MSM), and CUDA arithmetic for Nova's R1CS operations.  Its main optimization vertically concatenates the three matrices $(A,B,C)$ and replaces three same-vector sparse products by one checked device batch.  On a V100, a verified 1,024-step, 14,826-constraint fixture falls from \SI{612.609}{s} to \SI{329.535}{s} ($1.859\times$); fusion alone removes 4,092 synchronizations and 4,092 allocations relative to the resident-buffer version.  For the 166,700-neuron, 25,582,938-edge artifact, we report exact execution measurements and circuit lower bounds, not an unmeasured full-network proof time.
+\end{abstract}
+
+\section{Relation}
+
+Let a canonical square CSR graph be
+\begin{equation}
+  G=(N,p,j),\quad 0=p_0\leq\cdots\leq p_N=M,\quad
+  0\leq j_e<N.                                            \label{eq:csr}
+\end{equation}
+Columns inside every row are sorted and unique.  For private
+$x\in\F^N,w\in\F^M$, one step constrains
+\begin{equation}
+  y_r=\sum_{e=p_r}^{p_{r+1}-1} w_e x_{j_e},\qquad 0\leq r<N. \label{eq:forward}
+\end{equation}
+The data artifact also carries signed synapse counts $c_e$ and uses
+\begin{equation}
+  w_e=\frac{c_e}{\sum_{k=p_r}^{p_{r+1}-1}|c_k|},
+  \quad e\in[p_r,p_{r+1}),                                  \label{eq:weights}
+\end{equation}
+for its deterministic floating-point execution oracle.  In the proof relation,
+$w$ is an arbitrary private field witness: no training or normalization rule is
+claimed.
+
+\subsection{Canonical roots}
+
+Seven little-endian \code{u32} values are packed per BN254 field.  With
+$\mathsf{pack}_7$, the topology stream is
+\begin{align}
+  s_G={}&(L,N,N+1,M)\,\|\,\mathsf{pack}_7(p)\,\|\,
+          \mathsf{pack}_7(j),                                \label{eq:stream}\\
+  L={}&4+\ceil{(N+1)/7}+\ceil{M/7}.                          \label{eq:fields}
+\end{align}
+For rate $\rho=11$, $a_0=0$, zero-padded chunks $q_i\in\F^{11}$, and domain
+$D_T=\code{zkfly/poseidon/topology/v1}$,
+\begin{equation}
+  a_{i+1}=\Poseidon_{D_T}(a_i,q_i),\qquad R_G=a_{\ceil{L/11}}. \label{eq:topology-fold}
+\end{equation}
+The width-13, $x^5$ Circom parameterization is fixed in host, circuit, and CUDA
+code.  Input and output vectors use the same fold shape under a distinct domain
+$D_F=\code{zkfly/poseidon/forward/v1}$; write the result as $\Commit_F(\cdot)$
+\cite{grassi2021poseidon}.
+
+\begin{algorithm}[t]
+\caption{Canonical topology commitment}
+\label{alg:topology}
+\begin{algorithmic}[1]
+\Require $N$, CSR arrays $p[0..N]$, $j[0..M)$
+\Ensure $R_G$
+\State assert \cref{eq:csr} and sorted-unique columns
+\State $s\gets(L,N,N+1,M)\|\mathsf{pack}_7(p)\|\mathsf{pack}_7(j)$
+\State $a\gets0$
+\For{$q\gets\mathsf{chunks}_{11}(s)$}
+  \State $a\gets\Poseidon_{D_T}(a,q\|0^{11-|q|})$
+\EndFor
+\State \Return $a$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Recursive state}
+
+For step $t$, Nova carries
+\begin{equation}
+  z_t=(u_t,R_G),\quad u_t=\Commit_F(x_t),\quad
+  z_{t+1}=(\Commit_F(y_t),R_G).                              \label{eq:state}
+\end{equation}
+The witness is $(x_t,w_t)$ and the circuit enforces
+\begin{equation}
+ \mathcal R_G(z_t,z_{t+1};x_t,w_t)=
+ \left\{
+ \begin{array}{l}
+ u_t=\Commit_F(x_t),\\
+ y_t=W_t x_t\text{ under \cref{eq:forward}},\\
+ u_{t+1}=\Commit_F(y_t),\quad R'_G=R_G.
+ \end{array}\right.                                        \label{eq:relation}
+\end{equation}
+Consecutive witnesses satisfy
+$\Commit_F(x_{t+1})=\Commit_F(y_t)$.  Nova folds the resulting relaxed R1CS
+instances \cite{kothapalli2021nova}.  The primary commitment backend is
+HyperKZG, derived from the Gemini/KZG polynomial-commitment line
+\cite{bootle2022gemini,kate2010kzg}; MSM is dispatched to Blitzar.
+
+\section{CUDA arithmetic boundary}
+
+For R1CS matrices $A,B,C\in\F^{m\times d}$ and packed
+$z\in\F^d$, Nova repeatedly requests
+\begin{equation}
+  (a,b,c)=(Az,Bz,Cz).                                        \label{eq:abc}
+\end{equation}
+The compatibility interface has a three-product default; the CUDA override
+constructs
+\begin{equation}
+  \bar M=\begin{bmatrix}A\\B\\C\end{bmatrix}\in\F^{3m\times d},
+  \qquad \bar Mz=\begin{bmatrix}Az\\Bz\\Cz\end{bmatrix}. \label{eq:vstack}
+\end{equation}
+
+\begin{algorithm}[t]
+\caption{Exact-key fused $A/B/C$ sparse product}
+\label{alg:fused}
+\begin{algorithmic}[1]
+\Require CSR $A,B,C$ with $m$ rows; packed $z$; field $(b_F,q_F)$
+\Ensure $Az,Bz,Cz$
+\State $K_X\gets(X.p,X.j,X.v,b_F,q_F)$ for $X\in\{A,B,C\}$
+\State $K\gets(K_A,K_B,K_C,m)$
+\If{$K\notin\mathcal C$}
+  \State $\bar p\gets A.p\|\bigl(\nnz(A)+B.p[1:]\bigr)$
+  \State $\phantom{\bar p\gets{}}\|\bigl(\nnz(A)+\nnz(B)+C.p[1:]\bigr)$
+  \State $\bar j\gets A.j\|B.j\|C.j$; $\bar v\gets A.v\|B.v\|C.v$
+  \State $\mathcal C[K]\gets\mathsf{Upload}(\bar p,\bar j,\bar v,\mathsf{alloc}(3m))$
+\EndIf
+\State $z_D\gets\mathsf{Upload}(\mathsf{Montgomery}(z))$
+\State $o_D\gets\SpMV(\mathcal C[K],z_D)$ \Comment{one launch}
+\State $o\gets\mathsf{DownloadAndSync}(o_D)$ \Comment{one boundary}
+\State \Return $(o[0:m],o[m:2m],o[2m:3m])$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Cache identity.}
+No digest key is used:
+\begin{equation}
+ K_M=(p_M,j_M,v_M,b_F,q_F),\qquad K=(K_A,K_B,K_C,m).          \label{eq:key}
+\end{equation}
+The bounded FIFO retains at most 8 fused CSR batches; reusable arithmetic
+outputs are keyed by exact field-element length.
+
+\paragraph{Equivalence.}
+For $0\leq r<m$, the first, second, and third row intervals of $\bar M$ are
+exactly rows $r$ of $A,B,C$, while all column indices remain unchanged.
+Therefore \cref{eq:vstack} holds entrywise.  Equality in \cref{eq:key} implies
+byte-identical canonical CSR input, field width, and modulus; hence a cache hit
+selects the same device matrix.  A regression test checks offset shifting and
+ordering; every timed recursive proof is verified against its public root and
+endpoint commitments.
+
+\section{Operation model}
+
+Let $n\geq1$ be recursive steps and $k=n-1$.  Each non-base Nova fold performs
+two R1CS evaluations.  Thus
+\begin{align}
+  N_{\mathrm{SpMV}}^{\mathrm{logical}}&=6k,&
+  N_{\mathrm{SpMV}}^{\mathrm{batch}}&=2k,\nonumber\\
+  N_{\mathrm{lin}}&=4k,&N_{\mathrm{cross}}&=2k.             \label{eq:counts}
+\end{align}
+Resident, unfused execution has
+\begin{equation}
+  S_{v2}=B_{v2}=12k,\quad A_{v2}=22k,                        \label{eq:v2cost}
+\end{equation}
+while fused execution has
+\begin{equation}
+  S_{v3}=B_{v3}=8k,\quad A_{v3}=18k.                         \label{eq:v3cost}
+\end{equation}
+Here $S,B,A$ are synchronizations, physical arithmetic batches, and device
+buffer allocations.  At $n=1024$, fusion removes $4k=4,092$ synchronizations
+and allocations.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\columnwidth,height=4.35cm,
+  xmode=log,ymode=log,log basis x=2,
+  xlabel={recursive steps $n$},ylabel={prove time (s)},
+  xtick={1,8,64,1024},xticklabels={1,8,64,1024},
+  grid=major,legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west},
+  tick label style={font=\scriptsize},label style={font=\small}]
+\addplot+[mark=triangle*,thick,color=zkorange] coordinates
+  {(1,0.066896) (8,3.792606) (64,36.813832) (1024,612.609359)};
+\addlegendentry{exclusive baseline}
+\addplot+[mark=square*,thick,color=zkblue] coordinates
+  {(1,0.063781) (8,2.363359) (64,22.241111) (1024,373.513551)};
+\addlegendentry{resident v2}
+\addplot+[mark=*,thick,color=zkgreen] coordinates
+  {(1,0.064125) (8,2.206236) (64,20.387656) (1024,329.535243)};
+\addlegendentry{fused v3}
+\end{axis}
+\end{tikzpicture}
+\caption{HyperKZG + GPU-MSM proving time; all outputs verified.}
+\label{fig:prove-time}
+\end{figure}
+
+\section{Measurements}
+
+\paragraph{Platform.}
+Tesla V100-SXM3-32GB (SM 7.0), CUDA 12.6.85, driver 580.159.03.  Compiler:
+\code{rustc 1.96.0-nightly}; \code{cuda-oxide 0.2.0}.  Profiling uses a single
+serialized CUDA context and reusable Nova parameters.  Setup is excluded from
+prove/verify columns.
+
+\begin{table}[t]
+\centering
+\caption{Verified fixed-circuit profile ($C=14,826$, $V=14,825$).}
+\label{tab:proof-profile}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{r S[table-format=3.3] S[table-format=3.3] S[table-format=3.3] S[table-format=1.3]}
+\toprule
+$n$ & {exclusive (s)} & {resident (s)} & {fused (s)} & {$v3$ verify (s)}\\
+\midrule
+1    & 0.067 & 0.064 & 0.064 & 0.301\\
+8    & 3.793 & 2.363 & 2.206 & 0.126\\
+64   & 36.814 & 22.241 & 20.388 & 0.127\\
+1024 & 612.609 & 373.514 & 329.535 & 0.127\\
+\bottomrule
+\end{tabular}}
+\vspace{2pt}
+
+\raggedright Setup: baseline \SI{1.124}{s}, resident \SI{1.149}{s}, fused
+\SI{1.187}{s}.  At $n=1024$: fused/exclusive $=0.5381$ ($1.859\times$);
+fused/resident $=0.8823$ ($1.133\times$).
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Fused $n=1024$ prover telemetry.}
+\label{tab:telemetry}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l r r r}
+\toprule
+operation & logical calls & physical batches & time (s)\\
+\midrule
+$A/B/C$ SpMV & 6,138 & 2,046 & 77.657\\
+vector linear combination & 4,092 & 4,092 & 86.097\\
+cross term & 2,046 & 2,046 & 67.736\\
+MSM & 2,047 & 2,047 & 36.268\\
+\midrule
+MSM scalars & \multicolumn{2}{r}{30,347,798} & \\
+CSR cache & \multicolumn{2}{r}{6,138 hit / 0 miss} & \\
+output cache & \multicolumn{2}{r}{6,138 hit / 0 miss} & \\
+allocations / synchronizations & \multicolumn{2}{r}{18,414 / 8,184} & \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Full artifact: execution, then capacity}
+
+The source connectome reports 166,700 neurons \cite{berg2026malecns}.  The
+derived deterministic artifact has
+\begin{align}
+ N&=166{,}700,\qquad M=25{,}582{,}938,\nonumber\\
+ |\mathsf{CSR}|&=205{,}330{,}308\ \text{bytes}.              \label{eq:scale}
+\end{align}
+and topology root
+\begin{equation}
+ \code{413eb9f07080ce45...46caaa9a01b0f323}.                 \label{eq:root}
+\end{equation}
+
+\begin{table}[t]
+\centering
+\caption{Full-graph numeric forward pass; this is not proving time.}
+\label{tab:executor}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l S[table-format=3.3] S[table-format=3.3] S[table-format=1.3]}
+\toprule
+CUDA executor & {kernel (ms)} & {end-to-end (ms)} & {Gedge/s}\\
+\midrule
+resident row/thread & 13.575 & 13.722 & 1.864\\
+edge products + row reduce & 4.630 & 4.770 & 5.363\\
+\bottomrule
+\end{tabular}}
+\vspace{2pt}
+
+\raggedright Both: 100 measured iterations after 10 warmups, device-resident
+topology/weights/input/output, maximum absolute error $=0$ against the
+deterministic \code{f32} CPU oracle.  The edge-parallel run reports
+\SI{100.158}{GiB/s} effective traffic.
+\end{table}
+
+The implemented estimator uses a conservative lower bound
+$C_H=2,174$ constraints per width-13 Poseidon permutation.  Therefore
+\begin{align}
+ L_T&=4+\ceil{(N+1)/7}+\ceil{M/7}=3{,}678{,}525,\nonumber\\
+ S_T&=\ceil{L_T/11}=334{,}412,\nonumber\\
+ C_T&=S_TC_H=727{,}011{,}688,                               \label{eq:top-cap}\\
+ Q&=\ceil{N/11}=15{,}155,\qquad P_F=2Q=30{,}310,\nonumber\\
+ C_F&=P_FC_H+M+N=91{,}643{,}578,                            \label{eq:fwd-cap}\\
+ W_F&=M+2N=25{,}916{,}338\ \text{fields}\nonumber\\
+    &=829{,}322{,}816\ \text{bytes (canonical)}.            \label{eq:witness-cap}
+\end{align}
+One topology registration plus $T$ forward ticks has
+\begin{align}
+ C_{\mathrm{total}}(T)&\geq C_T+TC_F,\nonumber\\
+ C_{\mathrm{total}}(1000)&=92{,}370{,}589{,}688.             \label{eq:total-cap}
+\end{align}
+
+\begin{table}[t]
+\centering
+\caption{Measured vs. projected proof scope.}
+\label{tab:scope}
+\scriptsize
+\begin{tabularx}{\columnwidth}{@{}l r r@{}}
+\toprule
+quantity & measured fixture & full artifact\\
+\midrule
+neurons / edges & 3 / 4 & 166,700 / 25,582,938\\
+primary constraints & 14,826 & $\geq$91,643,578\\
+constraint ratio & $1\times$ & $\geq$6,181.27$\times$\\
+Poseidon vector chunks & 1 & 15,155\\
+Powers-of-Tau scale & $2^{15}$ available & $\geq2^{27}$ projected\\
+recursive proof & verified & not run\\
+wall-clock proof time & measured & not claimed\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Result boundary}
+
+\begin{tabularx}{\columnwidth}{@{}lX@{}}
+\textbf{proved:} & $z_0\xRightarrow[\mathcal R_G^n]{\mathrm{Nova}}z_n$;\\
+\textbf{measured:} & $n\leq1024$, $C=14{,}826$, HyperKZG + GPU-MSM + CUDA;\\
+\textbf{estimated:} & $C_T,C_F,W_F$ for \cref{eq:scale};\\
+\textbf{not claimed:} & full-artifact or distributed proof, training, weight commitment, or \SI{4.770}{ms} proof.\\
+\end{tabularx}
+Nova's recursive chain is sequential in the current implementation.  Graph
+tiles, Poseidon chunks, and MSMs admit parallel sub-work, but no distributed
+proof aggregation protocol is implemented or measured.  A full forward proof
+also requires a larger commitment key, a memory study, and an end-to-end run;
+the small-circuit timing in \cref{tab:proof-profile} is not extrapolated.
+
+\paragraph{Receipt integrity.}
+The fused standard and smoke receipts have SHA-256 prefixes/suffixes
+\code{72859e53...7e6c6716} and \code{0930b641...c30b26}, respectively.
+The profile schema records logical SpMV calls separately from physical batches;
+all standard cases and the 12-neuron, two-commitment-chunk regression verified.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

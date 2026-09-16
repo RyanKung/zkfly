@@ -1,0 +1,9 @@
+/target/
+/data/raw/
+/artifacts/*
+!/artifacts/.gitkeep
+/receipts/*
+!/receipts/.gitkeep
+/tmp/
+/docs/
+/output/
