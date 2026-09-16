@@ -5,6 +5,7 @@ members = [
     "crates/zkfly-commitment",
     "crates/zkfly-nova",
 ]
+exclude = ["vendor/nova-snark"]
 resolver = "3"
 
 [workspace.package]
@@ -18,7 +19,7 @@ arrow-ipc = { version = "59.1.0", features = ["lz4", "zstd"] }
 arrow-schema = "59.1.0"
 ark-bn254 = "0.5.0"
 ark-ff = "0.5.0"
-nova-snark = { version = "0.76.0", default-features = false }
+nova-snark = { path = "vendor/nova-snark", default-features = false }
 clap = { version = "4.6.6", features = ["derive"] }
 ff = "0.13.0"
 halo2curves = "0.9.0"
@@ -32,9 +33,6 @@ tempfile = "3.23.0"
 thiserror = "2.0.17"
 topology-commitment = { package = "zkfly-commitment", path = "crates/zkfly-commitment" }
 topology-nova = { package = "zkfly-nova", path = "crates/zkfly-nova" }
-
-[patch.crates-io]
-nova-snark = { path = "vendor/nova-snark" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

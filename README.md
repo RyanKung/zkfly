@@ -123,8 +123,8 @@ regression coverage; those parameters are not production-safe.
 
 ## CUDA sidecar
 
-`cuda-nova` is a separate workspace crate with a stable boundary intended for
-later extraction into its own public repository. It uses CUDA Rust through
+`cuda-nova` is a standalone crate with a stable Cargo dependency boundary; no
+Git submodule is required. It uses CUDA Rust through
 NVIDIA Research's `cuda-oxide` and calls Microsoft Research's official Nova
 implementation through `nova-snark`. It owns the cuda-oxide context, PTX
 module, device buffers, and a one-lane-per-fold GPU preflight. The preflight
