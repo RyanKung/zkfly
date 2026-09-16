@@ -30,7 +30,7 @@ host/device boundary, feature matrix, commands, and current measurement scope.
 - `crates/zkfly-matrix`: deterministic MaleCNS-to-CSR artifact builder.
 - `crates/zkfly-commitment`: canonical Poseidon topology encoding and root.
 - `crates/zkfly-nova`: Nova topology and private weighted-forward relations.
-- [`cuda-nova`](https://github.com/RyanKung/cuda-nova): CUDA Rust sidecar and structured proof profiler.
+- [`cuda-nova`](https://github.com/RyanKung/cuda-nova): revision-pinned Cargo Git dependency, CUDA Rust sidecar, and structured proof profiler.
 - `crates/zkfly-bench`: CPU/CUDA execution benchmarks and capacity estimator.
 - `vendor/nova-snark`: audited Nova 0.76 integration patch.
 - `paper`: claim-bounded LaTeX paper and bibliography.
@@ -123,8 +123,9 @@ regression coverage; those parameters are not production-safe.
 
 ## CUDA sidecar
 
-`cuda-nova` is a standalone crate with a stable Cargo dependency boundary; no
-Git submodule is required. It uses CUDA Rust through
+`cuda-nova` is a standalone crate with a stable Cargo dependency boundary. The
+workspace pins commit `8b69422` directly in `[workspace.dependencies]`; no Git
+submodule or Cargo patch is required. It uses CUDA Rust through
 NVIDIA Research's `cuda-oxide` and calls Microsoft Research's official Nova
 implementation through `nova-snark`. It owns the cuda-oxide context, PTX
 module, device buffers, and a one-lane-per-fold GPU preflight. The preflight

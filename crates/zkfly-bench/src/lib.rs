@@ -20,6 +20,7 @@ pub use artifact::{
     ArtifactDimensions, ArtifactSummary, CsrArtifact, load_artifact, load_artifact_dimensions,
 };
 pub use benchmark::{BenchmarkConfig, BenchmarkReport, run_benchmark};
+pub use cuda_nova::{CudaNovaEngine, CudaNovaError, GpuBackendStats, GpuMsmStats};
 pub use error::BenchError;
 pub use estimate::{
     POSEIDON_PERMUTATION_CONSTRAINT_LOWER_BOUND, ProofStepEstimate, estimate_proof_steps,

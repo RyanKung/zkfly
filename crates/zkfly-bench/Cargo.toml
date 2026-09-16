@@ -12,6 +12,7 @@ cuda = ["dep:cuda-core", "dep:cuda-device", "dep:cuda-host"]
 
 [dependencies]
 clap.workspace = true
+cuda-nova.workspace = true
 zkfly-commitment = { path = "../zkfly-commitment" }
 serde.workspace = true
 serde_json.workspace = true

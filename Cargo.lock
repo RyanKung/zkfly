@@ -817,6 +817,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuda-nova"
+version = "0.1.0"
+source = "git+https://github.com/RyanKung/cuda-nova.git?rev=8b694223cb91c7f4ef87602df097c6d4b708b1fe#8b694223cb91c7f4ef87602df097c6d4b708b1fe"
+dependencies = [
+ "ark-bn254",
+ "ark-ff",
+ "halo2curves",
+ "light-poseidon",
+ "nova-snark 0.76.0 (git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932)",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "zkfly-commitment 0.1.0 (git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932)",
+ "zkfly-nova 0.1.0 (git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932)",
+]
+
+[[package]]
 name = "curve25519-dalek"
 version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1830,6 +1847,34 @@ dependencies = [
  "bincode",
  "bitvec",
  "blitzar",
+ "byteorder",
+ "digest 0.10.7",
+ "ff",
+ "generic-array 1.4.5",
+ "getrandom 0.2.17",
+ "halo2curves",
+ "itertools 0.14.0",
+ "num-bigint 0.4.8",
+ "num-integer",
+ "num-traits",
+ "once_cell",
+ "rand_chacha",
+ "rand_core 0.6.4",
+ "rayon",
+ "serde",
+ "serde_with",
+ "sha3",
+ "subtle",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "nova-snark"
+version = "0.76.0"
+source = "git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932#542cc3385d650461540533bda8c4397463e0c932"
+dependencies = [
+ "bincode",
+ "bitvec",
  "byteorder",
  "digest 0.10.7",
  "ff",
@@ -3581,15 +3626,29 @@ dependencies = [
  "cuda-core",
  "cuda-device",
  "cuda-host",
+ "cuda-nova",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "zkfly-commitment",
+ "zkfly-commitment 0.1.0",
 ]
 
 [[package]]
 name = "zkfly-commitment"
 version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "ark-ff",
+ "hex",
+ "light-poseidon",
+ "serde",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "zkfly-commitment"
+version = "0.1.0"
+source = "git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932#542cc3385d650461540533bda8c4397463e0c932"
 dependencies = [
  "ark-bn254",
  "ark-ff",
@@ -3625,9 +3684,24 @@ dependencies = [
  "ff",
  "halo2curves",
  "light-poseidon",
- "nova-snark",
+ "nova-snark 0.76.0",
  "thiserror 2.0.20",
- "zkfly-commitment",
+ "zkfly-commitment 0.1.0",
+]
+
+[[package]]
+name = "zkfly-nova"
+version = "0.1.0"
+source = "git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932#542cc3385d650461540533bda8c4397463e0c932"
+dependencies = [
+ "ark-bn254",
+ "ark-ff",
+ "ff",
+ "halo2curves",
+ "light-poseidon",
+ "nova-snark 0.76.0 (git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932)",
+ "thiserror 2.0.20",
+ "zkfly-commitment 0.1.0 (git+https://github.com/RyanKung/zkfly.git?rev=542cc3385d650461540533bda8c4397463e0c932)",
 ]
 
 [[package]]
